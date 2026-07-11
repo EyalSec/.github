@@ -24,13 +24,33 @@ EyalSec has already flagged two critical CVEs in Django.
   can write.
 - **Sink** - a risky action it flows into: running a system command, opening a
   file, running a database query, or deserializing data.
-- **Report or Raise** - chosen per machine. Report logs the event to your
-  dashboard and lets the program continue. Raise stops the risky action before
-  it runs, so an attack is blocked rather than only recorded.
+- **Report, or Report and Raise** - chosen per machine. Report logs the event to
+  your dashboard and lets the program continue. Report and Raise does both: it
+  logs the event **and** stops the risky action before it runs, so an attack is
+  blocked, not just recorded.
 
 Your source code and files never leave the machine. Only the detection event is
 sent to your dashboard: the sink that fired, the stack trace, where the data
 came from, and the data that triggered it.
+
+## What EyalSec can find that others can't
+
+Static scanners and linters read your source and guess. EyalSec watches your
+program actually run, so it catches what they miss:
+
+- **Real, exploitable flows, not guesses.** It only flags untrusted data that
+  actually reaches a risky call at runtime, so you get real findings instead of a
+  wall of maybe-bugs.
+- **Vulnerabilities inside your dependencies.** Because it watches execution, it
+  sees untrusted data reach a sink deep inside installed third-party libraries and
+  frameworks, not just your own code. That is how EyalSec flagged two critical
+  CVEs in Django.
+- **The blind spots of static analysis.** Code generated or loaded at runtime
+  (`exec`, `eval`, dynamic imports) and flows a scanner can't parse are exactly
+  where EyalSec is strongest, because it watches the real execution.
+- **The actual attack, with evidence.** Every detection is the real event: the
+  sink that fired, the payload, where the data came from, and the exact line and
+  stack trace, so you can confirm and fix it fast.
 
 ## Install
 
