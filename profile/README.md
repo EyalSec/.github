@@ -33,6 +33,46 @@ Your source code and files never leave the machine. Only the detection event is
 sent to your dashboard: the sink that fired, the stack trace, where the data
 came from, and the data that triggered it.
 
+## What it covers
+
+Detection is compiled into the interpreter rather than bolted on beside it:
+**162 sink call sites in C**, plus 11 standard-library hook sites.
+
+That covers SQL injection, command and argument injection, path traversal, zip
+and tar extraction escapes, insecure deserialization, server-side code
+injection, SSRF, CRLF header injection, log forging, template injection, XXE,
+XPath and LDAP filter injection, NoSQL injection, weak hashes and KDFs,
+timing-unsafe comparison, predictable tokens, and hardcoded credentials
+reported at the point they leave the process.
+
+**It covers the drivers and libraries real applications use**, not just the
+standard library. EyalSec ships instrumented builds of `psycopg2`, `psycopg` v3,
+`mysqlclient`, `mariadb`, `oracledb` and `python-ldap`, each with the sink on
+the statement string. On top of that, **42 third-party libraries** are covered
+by declarative adapters: Django, Jinja2, SQLAlchemy, PyMongo, Redis, Neo4j,
+asyncpg, PyJWT, PyYAML, Paramiko and more. When an upstream release renames a
+method out from under an adapter, the coverage miss is reported to your
+dashboard rather than silently dropped.
+
+## Why it does not drown you in false positives
+
+The reason security tools go unused is not that they miss things. It is that
+they report too much.
+
+- **A sink fires on the statement, never on a bound parameter.** Correctly
+  parameterized code stays silent no matter how hostile the value is.
+- **EyalSec knows what a sanitizer fixed, and for which sink.** Escaping is not
+  global: `urlencode` neutralizes a URL context and does nothing for SQL, and
+  the engine grades it that way rather than suppressing a real finding or
+  reporting one that was already fixed.
+- **A detection means the data actually arrived.** Not that a code path exists,
+  and not that a pattern matched.
+
+Where a detector cannot be certain, it says so instead of overclaiming. LDAP is
+the clearest case: the protocol has no bind-parameter mechanism, so even
+correctly escaped input is still spliced into the filter string. That event
+reports "attacker data reached the LDAP filter", not "injection proven".
+
 ## What EyalSec can find that others can't
 
 Other tools read your source and guess, watch the network edge, or restrict
@@ -179,6 +219,16 @@ machine; only the detection event posts to your dashboard.
 - **[Documentation](https://eyalsec.com/docs)** - install, run, read events, configure rules
 - **[Pricing](https://eyalsec.com/pricing)** - size machines and monthly events for a price
 - **[Security](https://eyalsec.com/security)** - the security model; your code stays on your machine
+
+### Repositories
+
+- **[es-python](https://github.com/EyalSec/es-python)** - the runtime: what it
+  catches, how it installs, and how it differs from a scanner
+- **[vulnerable-python](https://github.com/EyalSec/vulnerable-python)** - a
+  deliberately vulnerable Flask app where each endpoint wires one taint source
+  into one sink. Run the same unchanged file under stock CPython and it is a
+  normal exploitable app; run it under es-python and every attack that reaches
+  a sink is reported. The fastest way to see the difference yourself.
 
 ---
 
