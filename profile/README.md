@@ -35,8 +35,8 @@ came from, and the data that triggered it.
 
 ## What it covers
 
-Detection is compiled into the interpreter rather than bolted on beside it:
-**162 sink call sites in C**, plus 11 standard-library hook sites.
+Detection runs inside your program as it executes rather than beside it:
+**173 sink call sites**, each watching one dangerous operation.
 
 That covers SQL injection, command and argument injection, path traversal, zip
 and tar extraction escapes, insecure deserialization, server-side code
@@ -193,13 +193,12 @@ runs, so there is no behavior left for the EDR to observe.
 
 ## The same idea in the browser: es-chromium
 
-The pattern above is not specific to Python. `es-chromium` is a build of
-Chromium that carries the same tracking through V8 and Blink, so that data an
-attacker can influence, arriving from the URL, from `postMessage`, from a
-cookie or from web storage, is followed until it reaches a DOM sink such as
-`innerHTML`, `eval` or a script `src`. The tracking is compiled into the
-browser in C and C++; nothing is injected into the page and nothing is asked of
-the site.
+The pattern above is not specific to Python. `es-chromium` is a browser that
+carries the same tracking as you browse, so that data an attacker can
+influence, arriving from the URL, from `postMessage`, from a cookie or from web
+storage, is followed until it reaches a DOM sink such as `innerHTML`, `eval` or
+a script `src`. The tracking is part of the browser itself; nothing is injected
+into the page, no extension is installed, and nothing is asked of the site.
 
 The difference from a scanner is the same difference. A scanner guesses at
 which sinks are reachable, without the third party widgets loaded and without
@@ -247,12 +246,12 @@ machine; only the detection event posts to your dashboard.
   catches, how it installs, and how it differs from a scanner
 - **[vulnerable-python](https://github.com/EyalSec/vulnerable-python)** - a
   deliberately vulnerable Flask app where each endpoint wires one taint source
-  into one sink. Run the same unchanged file under stock CPython and it is a
+  into one sink. Run the same unchanged file under your normal Python and it is a
   normal exploitable app; run it under es-python and every attack that reaches
   a sink is reported. The fastest way to see the difference yourself.
-- **[es-chromium](https://github.com/EyalSec/es-chromium)** - the browser: a
-  Chromium build that tracks taint through V8 and Blink and reports DOM-XSS as
-  a flow rather than as a guess
+- **[es-chromium](https://github.com/EyalSec/es-chromium)** - the browser: it
+  tracks taint as you browse and reports DOM-XSS as a flow rather than as a
+  guess
 - **[vulnerable-javascript](https://github.com/EyalSec/vulnerable-javascript)** -
   a deliberately vulnerable retail dashboard, live at a real origin, built as
   the demonstration target for es-chromium. Every flaw sits inside a feature
