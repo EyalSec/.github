@@ -191,6 +191,27 @@ pickle.loads(blob)  # SINK -> raises before the gadget detonates
 fact, a spawned shell or a beacon. es-python raises *before* the pickle gadget
 runs, so there is no behavior left for the EDR to observe.
 
+## The same idea in the browser: es-chromium
+
+The pattern above is not specific to Python. `es-chromium` is a build of
+Chromium that carries the same tracking through V8 and Blink, so that data an
+attacker can influence, arriving from the URL, from `postMessage`, from a
+cookie or from web storage, is followed until it reaches a DOM sink such as
+`innerHTML`, `eval` or a script `src`. The tracking is compiled into the
+browser in C and C++; nothing is injected into the page and nothing is asked of
+the site.
+
+The difference from a scanner is the same difference. A scanner guesses at
+which sinks are reachable, without the third party widgets loaded and without
+the state a previous visit left behind. `es-chromium` is the browser, so it
+reports a flow that actually happened, with the payload attached and the
+attacker controlled characters marked inside it.
+
+See it on a real page:
+**[vulnerable-javascript](https://github.com/EyalSec/vulnerable-javascript)**,
+a deliberately vulnerable dashboard hosted at a live origin, where 21 flows
+across 8 sources and 18 sinks are each reachable from a single URL.
+
 ## Install
 
 Sign in, add a machine on your dashboard, and run the one-line installer it
@@ -229,6 +250,13 @@ machine; only the detection event posts to your dashboard.
   into one sink. Run the same unchanged file under stock CPython and it is a
   normal exploitable app; run it under es-python and every attack that reaches
   a sink is reported. The fastest way to see the difference yourself.
+- **[es-chromium](https://github.com/EyalSec/es-chromium)** - the browser: a
+  Chromium build that tracks taint through V8 and Blink and reports DOM-XSS as
+  a flow rather than as a guess
+- **[vulnerable-javascript](https://github.com/EyalSec/vulnerable-javascript)** -
+  a deliberately vulnerable retail dashboard, live at a real origin, built as
+  the demonstration target for es-chromium. Every flaw sits inside a feature
+  that has a reason to exist, and every flow is reachable from one URL.
 
 ---
 
