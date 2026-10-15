@@ -263,7 +263,6 @@ file-heavy program costs the most. Measure it on your own workload.
 - **[Documentation](https://eyalsec.com/docs)** - install, run, read events, configure rules
 - **[Research](https://eyalsec.com/research)** - write-ups on Python injection and runtime detection
 - **[Vulnerability guides](https://eyalsec.com/vulnerabilities)** - each injection class in Python, and how to fix it
-- **[Python injection checker](https://eyalsec.com/tools/python-injection-checker)** - a browser-side tool for checking Python code for injection risks
 - **[Pricing](https://eyalsec.com/pricing)** - size machines and monthly events for a price
 - **[Security](https://eyalsec.com/security)** - the security model, and what leaves your machine
 - **[Book a live demo](https://eyalsec.com/contact)** - the way in

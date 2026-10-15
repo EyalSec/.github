@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability in EyalSec
+    url: https://eyalsec.com/legal/vulnerability-disclosure
+    about: Please email security@eyalsec.com. Do not open a public issue.
+  - name: Ask a question
+    url: https://github.com/EyalSec/es-python/discussions
+    about: How to use the products, how to read an event, how to tune rules.
+  - name: Documentation
+    url: https://eyalsec.com/docs
+    about: Install, run, read events, write rules, run it in CI, use the API.
+  - name: Plans and access
+    url: https://eyalsec.com/contact
+    about: Book a live demo. There is no self-serve plan and no trial.
