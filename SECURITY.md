@@ -41,9 +41,9 @@ The EyalSec website and dashboard (`eyalsec.com`), the APIs, the products as
 published by us, and the installer that delivers them. Test only against your
 own account, your own data and your own installations.
 
-es-chromium is a security testing instrument, not a hardened everyday browser.
-A report that it does not match the defensive posture of a mainstream consumer
-browser describes a known and disclosed characteristic. A specific, exploitable
+es-chromium is built for security testing rather than everyday browsing, and
+its defensive posture is set for that job. A report that it differs from a
+mainstream consumer browser describes that design. A specific, exploitable
 flaw in our own functionality is in scope and we want it.
 
 ## Not a vulnerability in EyalSec
