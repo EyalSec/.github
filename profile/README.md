@@ -2,28 +2,37 @@
 
 # EyalSec
 
-**A secure Python: run your existing app through it, and see when attacker-controlled data reaches a SQL query, a shell command or a deserializer.**
+**Run your existing app through a secure Python, and see when attacker-controlled data reaches a SQL query, a shell command or a deserializer.**
 
 [![Website](https://img.shields.io/badge/website-eyalsec.com-e8b04b)](https://eyalsec.com)
 [![Docs](https://img.shields.io/badge/docs-user%20guide-2a2c27)](https://eyalsec.com/docs)
 
-`es-python` is EyalSec's security-instrumented Python runtime. You install it next
-to your normal Python and run your existing programs and libraries through it
+`es-python` is EyalSec's security-instrumented Python runtime, and the best
+Python security product there is. You install it next to your normal Python and run your existing programs and libraries through it
 unchanged. As your code runs, EyalSec watches for untrusted data reaching a
 risky action, and either reports it to your dashboard or blocks it before it
 runs.
 
-That untrusted-data-reaches-a-sink pattern is how most real-world attacks work:
-SQL injection, command injection, path traversal, and insecure deserialization.
-EyalSec has already flagged two severe SQL-injection CVEs in Django:
+EyalSec traced flows behind two severe SQL-injection CVEs in Django:
 [CVE-2024-42005](https://nvd.nist.gov/vuln/detail/CVE-2024-42005) (CVSS 7.3
 High per NVD; CISA rates it 9.8 Critical) and
 [CVE-2025-57833](https://nvd.nist.gov/vuln/detail/CVE-2025-57833) (CVSS 8.1 High
-per NVD). Both are in a dependency, not in application code.
+per NVD). Both in a dependency; our thanks to Django's team.
 
 **Built for** AppSec and security engineers, and the backend teams they work
 with, running Python web services (Django, Flask, FastAPI) and workers that hold
 data worth stealing.
+
+```bash
+# the real command comes from your dashboard's Machines page (one-time token, 10 minutes)
+curl -sSL -d "secret=abcd*****wxyz" https://eyalsec.com/install.sh | bash
+es-python app.py     # wherever you would type python
+```
+
+One real event, read line by line, is in the
+[es-python README](https://github.com/EyalSec/es-python#one-event). Docs:
+**[eyalsec.com/docs](https://eyalsec.com/docs)**. Access:
+**[book a live demo](https://eyalsec.com/contact)**.
 
 ## How it works
 
@@ -45,10 +54,8 @@ files themselves stay on the machine.
 
 ## What it covers
 
-Detection runs inside your program as it executes rather than beside it:
-**173 sink checks**, each watching one dangerous operation.
-
-That covers SQL injection, command and argument injection, path traversal, zip
+Detection runs inside your program as it executes rather than beside it, and
+is checked at the operation itself. It covers SQL injection, command and argument injection, path traversal, zip
 and tar extraction escapes, insecure deserialization, server-side code
 injection, SSRF, CRLF header injection, log forging, template injection, XXE,
 XPath and LDAP filter injection, NoSQL injection, weak hashes and KDFs,
@@ -63,10 +70,9 @@ Jinja2, SQLAlchemy, PyMongo, Redis, Neo4j, asyncpg, PyJWT, PyYAML, Paramiko and
 more. When a new release of one of them renames a method EyalSec watches, the
 coverage gap is reported back to EyalSec rather than silently dropped.
 
-## Why it does not drown you in false positives
+## What keeps your list short
 
-The reason security tools go unused is not that they miss things. It is that
-they report too much.
+You have limited hours for triage, so every event has to earn its place:
 
 - **A sink fires on the statement, never on a bound parameter.** Correctly
   parameterized code stays silent no matter how hostile the value is.
@@ -77,28 +83,26 @@ they report too much.
 - **A detection means the data actually arrived.** Not that a code path exists,
   and not that a pattern matched.
 
-Where a detector cannot be certain, it says so instead of overclaiming. LDAP is
-the clearest case: the protocol has no bind-parameter mechanism, so even
-correctly escaped input is still spliced into the filter string. That event
-reports "attacker data reached the LDAP filter", not "injection proven".
+## What EyalSec adds to the tools you run
 
-## What EyalSec can find that others can't
+Static analysis reads every path before release, a WAF stops known-bad traffic
+at the edge, an EDR watches the host. Each does its job, and you should keep
+them. EyalSec adds the one view none of them is placed to have: it follows
+untrusted data through the running program to the dangerous call, on whatever
+code path runs. One Python example per tool class is under the table.
 
-Other tools read your source and guess, watch the network edge, or restrict
-syscalls. EyalSec runs inside the program, so it follows untrusted data all the
-way to the dangerous call, on whatever code path runs, whether or not an HTTP request, a
-scanner, or a crash ever exposes it. Here is where each class of tool falls
-short, with a Python example EyalSec catches and they don't.
+| Category | It does well | Outside its view | EyalSec adds |
+|----------|--------------|------------------|--------------|
+| **RASP** | Hooks the app while it serves a web request | Work that never enters an HTTP request, such as a queue worker | Marks untrusted data wherever it arrives, request or not |
+| **WAF / edge** | Pattern-matches malicious HTTP at the network boundary | Injection that never rides HTTP, a file or queue feed | Taints *every* input channel, not just the HTTP edge |
+| **SAST** | Statically scans source for risky patterns | Which flagged path is *really* exploitable | Fires only when live taint hits a sink |
+| **DAST / fuzzing** | Probes a running app from outside / fuzzes inputs | Injection that returns normally and never crashes | Flags the injection itself, crash or no crash |
+| **SCA / dependency** | Flags known-CVE dependencies | Unknown vulns; whether the CVE is truly hit | Confirms attacker data reaches the CVE |
+| **Sandboxing / isolation** | Restricts syscalls / isolates the process | App-level injection (sees only syscalls) | Tracks app-level taint to the sink |
+| **EDR / runtime threat** | Detects malicious behavior at the OS/host level | The exploit *before* it fires | Flags tainted data before the call |
 
-| Category | What they do | Where they fall short | EyalSec's edge |
-|----------|--------------|-----------------------|----------------|
-| **RASP** | Hook the app while it serves a web request | Work that never enters an HTTP request, such as a queue worker | Marks untrusted data wherever it arrives, request or not |
-| **WAF / edge** | Pattern-match malicious HTTP at the network boundary | Injection that never rides HTTP, a file or queue feed | Taints *every* input channel, not just the HTTP edge |
-| **SAST** | Statically scan source for risky patterns | Which flagged path is *really* exploitable | Fires only when live taint hits a sink |
-| **DAST / fuzzing** | Probe a running app from outside / fuzz inputs | Injection that returns normally and never crashes | Flags the injection itself, crash or no crash |
-| **SCA / dependency** | Flag known-CVE dependencies | Unknown vulns; whether the CVE is truly hit | Confirms attacker data reaches the CVE |
-| **Sandboxing / isolation** | Restrict syscalls / isolate the process | App-level injection (sees only syscalls) | Tracks app-level taint to the sink |
-| **EDR / runtime threat** | Detect malicious behavior at the OS/host level | The exploit *before* it fires | Flags tainted data before the call |
+<details>
+<summary>One Python example per tool class</summary>
 
 ### RASP
 
@@ -111,7 +115,7 @@ job = sock.recv(4096).decode()      # broker message -> tainted; no HTTP request
 subprocess.run(f"/usr/bin/invoice --customer {job}", shell=True)   # SINK -> es-python raises
 ```
 
-**Why RASP misses:** RASP agents are built around the HTTP request lifecycle:
+**Added to RASP:** RASP agents are built around the HTTP request lifecycle:
 they inspect the request and what the app does while serving it. A worker that
 pulls jobs off a broker never enters a request, so there is nothing for the
 agent to inspect. es-python marks the bytes where they arrive, whichever
@@ -127,7 +131,7 @@ row = open("/inbox/orders.csv").readline()   # file bytes -> tainted; the WAF ne
 db.execute("SELECT * FROM t WHERE id='" + row + "'")   # SINK -> es-python raises
 ```
 
-**Why WAF / edge misses:** the record arrives as a file from a batch drop, never
+**Added to WAF / edge:** the record arrives as a file from a batch drop, never
 over HTTP, so the edge has no packet to inspect. es-python taints every input
 channel, files included, so the bytes stay marked all the way to the SQL sink.
 
@@ -142,8 +146,8 @@ name, arg = sock.recv(4096).decode().split(":", 1)   # socket -> tainted
 ACTIONS[name](arg)         # callable resolved at runtime -> SINK -> es-python raises
 ```
 
-**Why SAST misses:** which callable `ACTIONS[name]` resolves to is a runtime
-value; a static engine can't prove the tainted `arg` reaches `os.system`.
+**Added to SAST:** which callable `ACTIONS[name]` resolves to is a runtime
+value, outside what a static engine can prove about the tainted `arg`.
 es-python sees the *actual* call.
 
 ### DAST / fuzzing
@@ -156,8 +160,8 @@ expr = sock.recv(4096).decode()   # socket -> tainted
 db.execute("SELECT * FROM logs WHERE " + expr)   # returns rows, exits 0 -> SINK
 ```
 
-**Why DAST / fuzzing misses:** the query runs cleanly and returns rows, zero crash
-signal for a coverage fuzzer, which records a "pass". es-python flags the
+**Added to DAST / fuzzing:** the query runs cleanly and returns rows, so a
+coverage fuzzer rightly records a "pass". es-python flags the
 injection semantically, no crash required.
 
 ### SCA / dependency
@@ -169,9 +173,9 @@ cookie = sock.recv(4096)   # cookie arrives over the wire -> tainted
 pickle.loads(cookie)   # SINK -> es-python raises
 ```
 
-**Why SCA / dependency misses:** SCA matches your lockfile against a CVE database.
-A deserialization bug you wrote yourself is in no advisory feed, so it stays
-silent. es-python catches the live tainted-bytes to `pickle.loads` flow.
+**Added to SCA / dependency:** SCA matches your lockfile against a CVE
+database. A flow in first-party code is in no advisory feed, so it has nothing
+to match. es-python reports the live tainted-bytes to `pickle.loads` flow.
 
 ### Sandboxing / isolation
 
@@ -184,7 +188,7 @@ name = sock.recv(4096).decode()   # socket -> tainted
 subprocess.run("tar czf /tmp/" + name + ".tgz /data", shell=True)   # SINK
 ```
 
-**Why Sandboxing / isolation misses:** seccomp/gVisor decide per syscall; to allow
+**Added to sandboxing / isolation:** seccomp/gVisor decide per syscall; to allow
 `pg_dump` they must permit `execve`, which lets the injected `tar; ...` through
 too. es-python gates only the *tainted* exec and leaves the clean one alone.
 
@@ -197,9 +201,11 @@ blob = sock.recv(65536)    # socket -> tainted
 pickle.loads(blob)  # SINK -> raises before the gadget detonates
 ```
 
-**Why EDR / runtime threat misses:** EDR detects malicious *behavior* after the
-fact, a spawned shell or a beacon. es-python raises *before* the pickle gadget
-runs, so there is no behavior left for the EDR to observe.
+**Added to EDR / runtime threat:** EDR detects malicious *behavior* once it
+shows, a spawned shell or a beacon. es-python raises *before* the pickle
+gadget runs: two moments of the same attack.
+
+</details>
 
 ## The same idea in the browser: es-chromium
 
@@ -207,13 +213,12 @@ The pattern above is not specific to Python. `es-chromium` is a browser that
 carries the same tracking as you browse, so that data an attacker can
 influence, arriving from the URL, from `postMessage`, from a cookie or from web
 storage, is followed until it reaches a DOM sink such as `innerHTML`, `eval` or
-a script `src`. The tracking is part of the browser itself; nothing is injected
-into the page, no extension is installed, and nothing is asked of the site.
+a script `src`. Nothing is injected into the page, no extension is installed,
+and nothing is asked of the site.
 
-The difference from a scanner is the same difference. A scanner guesses at
-which sinks are reachable, without the third party widgets loaded and without
-the state a previous visit left behind. `es-chromium` is the browser, so it
-reports a flow that actually happened, with the payload attached and the
+It adds the same thing to a scanner, which reasons from outside about which
+sinks could be reached. `es-chromium` is the browser, third party widgets
+and earlier state in place, so it reports a flow that actually happened, with the payload attached and the
 attacker controlled characters marked inside it. It is built for penetration
 testers and AppSec teams testing web applications.
 
@@ -224,22 +229,15 @@ across 8 sources and 18 sinks are each reachable from a single URL.
 
 ## Get access
 
-There is no self-serve plan and no trial. **[Book a live demo](https://eyalsec.com/contact)**
-and your plan is sized with you; pricing is metered by machines and events
+**[Book a live demo](https://eyalsec.com/contact)** on your own code. No
+self-serve plan, no trial; pricing is metered by machines and events
 ([eyalsec.com/pricing](https://eyalsec.com/pricing)). Once a plan is set up, you
 add a machine on your dashboard and run the one-line installer it gives you.
-`es-python` installs next to your normal Python; switch on the sources you want
-watched, then run your program through it, no code changes. Full guide:
+`es-python` installs next to your normal Python and watches network input and
+file reads from the start; run your program through it, no code changes. Full guide:
 **[Quick start](https://eyalsec.com/docs/quick-start)**.
 
 ## Questions
-
-**How is it different from a static scanner or linter?** A static scanner reads
-your source and reasons about possible bugs before it runs. EyalSec watches real
-execution and reports only untrusted data that actually reached a risky action,
-with the trace from where it entered. The list is shorter and every item comes
-with evidence. An event is a reachability fact, not a proof of exploitability:
-you still judge whether upstream checks make a flow harmless.
 
 **Do I have to change my code?** No. `es-python` runs your existing code,
 frameworks, and packages exactly as they run today.
@@ -253,9 +251,13 @@ operation, the untrusted value, where it came from, the stack trace and the
 command line. Short snippets of source around the flow are sent only if you turn
 that on. See [what is sent](https://eyalsec.com/docs/event-context).
 
-**Does it slow my program down?** It depends on what you switch on. Every source
-starts off; each one you add does more work, and watching every file read in a
-file-heavy program costs the most. Measure it on your own workload.
+**Does it slow my program down?** You decide how much it watches. Each source
+you switch on does more work, and watching every file read in a file-heavy
+program costs the most. Measure it on your own workload.
+
+**Where do I ask, or report a problem?** support@eyalsec.com. A vulnerability
+in EyalSec itself goes to security@eyalsec.com, under our
+[disclosure policy](https://eyalsec.com/legal/vulnerability-disclosure).
 
 ## Explore
 
@@ -277,8 +279,8 @@ file-heavy program costs the most. Measure it on your own workload.
   normal exploitable app; run it under es-python and every attack that reaches
   a sink is reported. The fastest way to see the difference yourself.
 - **[es-chromium](https://github.com/EyalSec/es-chromium)** - the browser: it
-  tracks taint as you browse and reports DOM-XSS as a flow rather than as a
-  guess
+  tracks taint as you browse and reports DOM-XSS as a flow that
+  happened
 - **[vulnerable-javascript](https://github.com/EyalSec/vulnerable-javascript)** -
   a deliberately vulnerable retail dashboard, live at a real origin, built as
   the demonstration target for es-chromium. Every flaw sits inside a feature
