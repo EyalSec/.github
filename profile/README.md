@@ -251,9 +251,9 @@ operation, the untrusted value, where it came from, the stack trace and the
 command line. Short snippets of source around the flow are sent only if you turn
 that on. See [what is sent](https://eyalsec.com/docs/event-context).
 
-**Does it slow my program down?** You decide how much it watches. Each source
-you switch on does more work, and watching every file read in a file-heavy
-program costs the most. Measure it on your own workload.
+**How fast does it run?** You decide how much it watches. Each source you switch
+on does more tracking, and watching every file read in a file-heavy program does
+the most. Measure it on your own workload.
 
 **Where do I ask, or report a problem?** support@eyalsec.com. A vulnerability
 in EyalSec itself goes to security@eyalsec.com, under our
