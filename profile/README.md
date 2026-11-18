@@ -6,6 +6,7 @@
 
 [![Website](https://img.shields.io/badge/website-eyalsec.com-e8b04b)](https://eyalsec.com)
 [![Docs](https://img.shields.io/badge/docs-user%20guide-2a2c27)](https://eyalsec.com/docs)
+[![Live attack demo](https://img.shields.io/badge/live%20attack%20demo-vp.eyalsec.com-black.svg)](https://vp.eyalsec.com)
 
 `es-python` is EyalSec's security-instrumented Python runtime, and the best
 Python security product there is. You install it next to your normal Python and run your existing programs and libraries through it
@@ -33,6 +34,13 @@ One real event, read line by line, is in the
 [es-python README](https://github.com/EyalSec/es-python#one-event). Docs:
 **[eyalsec.com/docs](https://eyalsec.com/docs)**. Access:
 **[book a live demo](https://eyalsec.com/contact)**.
+
+**See it live at [vp.eyalsec.com](https://vp.eyalsec.com).** A public web app
+built with real security holes (SQL injection, command injection, unsafe file
+paths and more) runs on es-python. Send it an attack from your browser:
+es-python stops it and shows the attack it stopped. The app is open source
+([vulnerable-python](https://github.com/EyalSec/vulnerable-python)), so you can
+read the code you are attacking.
 
 ## How it works
 
@@ -168,6 +176,7 @@ in EyalSec itself goes to security@eyalsec.com, under our
 - **[Research](https://eyalsec.com/research)** - write-ups on Python injection and runtime detection
 - **[Vulnerability guides](https://eyalsec.com/vulnerabilities)** - each injection class in Python, and how to fix it
 - **[Pricing](https://eyalsec.com/pricing)** - size machines and monthly events for a price
+- **[Live attack demo](https://vp.eyalsec.com)** - a public app with real security holes, running on es-python: attack it from your browser and watch it get stopped
 - **[Security](https://eyalsec.com/security)** - the security model, and what leaves your machine
 - **[Book a live demo](https://eyalsec.com/contact)** - the way in
 
